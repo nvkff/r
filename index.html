@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ИВБк-24 // Расписание</title>
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #090a0c;
+            --surface: #101216;
+            --surface-hover: #16191f;
+            --border: #1e2229;
+            --border-strong: #2a303a;
+            --text: #f1f3f5;
+            --muted: #848d9a;
+            --dim: #4d5562;
+            --accent: #3b82f6;
+            --green: #22c55e;
+            --red: #ef4444;
+            --purple: #a855f7;
+            --font-sans: 'Plus Jakarta Sans', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-sans);
+            font-size: 13px;
+            padding: 0 12px 60px;
+            line-height: 1.4;
+        }
+        .container { max-width: 1100px; margin: 0 auto; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 20px; border-bottom: 1px solid var(--border);
+            font-family: var(--font-mono); font-size: 11px;
+        }
+        .brand { font-weight: 500; display: flex; align-items: center; gap: 8px; }
+        .brand::before { content: ''; width: 6px; height: 6px; background: var(--accent); display: inline-block; }
+        .hero { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
+        .hero .tag { font-family: var(--font-mono); font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; }
+        .hero h1 { font-size: clamp(18px, 2.2vw, 26px); font-weight: 700; color: #fff; }
+
+        .controls {
+            display: flex; flex-wrap: wrap; gap: 8px 12px;
+            padding: 8px 20px; background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            align-items: center;
+        }
+        .controls .filter-group { display: flex; gap: 4px; flex-wrap: wrap; }
+        .controls button {
+            background: transparent; border: 1px solid var(--border);
+            color: var(--muted); font-family: var(--font-mono); font-size: 10px;
+            padding: 4px 10px; cursor: pointer; text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .controls button.active { border-color: var(--accent); color: #fff; background: var(--surface-hover); }
+        .controls .export-btn {
+            margin-left: auto;
+            background: var(--accent); color: #fff; border: none;
+            padding: 4px 14px;
+        }
+
+        .week-tabs { display: flex; gap: 4px; padding: 6px 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+        .week-tab { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; padding: 4px 12px; border: 1px solid var(--border); cursor: pointer; color: var(--muted); background: transparent; }
+        .week-tab.active { border-color: var(--accent); color: #fff; background: var(--surface-hover); }
+        .week-content { display: none; }
+        .week-content.active { display: block; }
+
+        .schedule-grid {
+            display: grid; grid-template-columns: 60px 1fr;
+            border-bottom: 1px solid var(--border);
+        }
+        .schedule-grid .day-label {
+            padding: 6px 10px; font-family: var(--font-mono); font-size: 10px;
+            color: var(--muted); border-right: 1px solid var(--border);
+            background: var(--surface);
+        }
+        .schedule-grid .day-cells { padding: 4px 10px; }
+        .pair {
+            padding: 2px 0; border-bottom: 1px solid var(--border);
+            cursor: pointer; transition: background 0.1s;
+        }
+        .pair:hover { background: var(--surface-hover); }
+        .pair:last-child { border-bottom: none; }
+        .pair .time { font-family: var(--font-mono); font-size: 10px; color: var(--dim); display: inline-block; width: 36px; }
+        .pair .subject { color: #fff; }
+        .pair .meta { font-size: 10px; color: var(--muted); }
+
+        .type-badge {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 9px;
+            font-weight: 600;
+            padding: 0 6px;
+            border-radius: 3px;
+            margin-right: 6px;
+        }
+
+        .empty-day { color: var(--dim); font-style: italic; padding: 4px 0; }
+
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.7); z-index: 1000;
+            align-items: center; justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-box {
+            background: var(--surface); border: 1px solid var(--border-strong);
+            max-width: 500px; width: 90%; padding: 24px;
+            position: relative;
+        }
+        .modal-box .close {
+            position: absolute; top: 8px; right: 12px;
+            background: none; border: none; color: var(--muted);
+            font-size: 18px; cursor: pointer;
+        }
+        .modal-box h3 { margin-bottom: 8px; color: #fff; }
+        .modal-box dl { display: grid; grid-template-columns: 80px 1fr; gap: 4px 12px; font-size: 13px; }
+        .modal-box dt { color: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+
+        @media (max-width: 720px) {
+            .schedule-grid { grid-template-columns: 1fr; }
+            .schedule-grid .day-label { border-right: none; }
+            .controls { flex-direction: column; align-items: stretch; }
+            .controls .export-btn { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="brand">SCHEDULE // ИВБк-24</div>
+        <div style="color:var(--muted);">2025–2026</div>
+    </header>
+
+    <section class="hero">
+        <div class="tag">Расписание занятий</div>
+        <h1>ИВБк-24</h1>
+    </section>
+
+    <div class="controls">
+        <div class="filter-group">
+            <button class="filter-btn active" data-filter="all">Все</button>
+            <button class="filter-btn" data-filter="Л">Лекции</button>
+            <button class="filter-btn" data-filter="П">Практики</button>
+            <button class="filter-btn" data-filter="ЛР">Лабораторные</button>
+        </div>
+        <button class="export-btn" id="exportCsv">⬇ CSV</button>
+    </div>
+
+    <div class="week-tabs">
+        <button class="week-tab active" data-week="odd">Нечётная</button>
+        <button class="week-tab" data-week="even">Чётная</button>
+    </div>
+
+    <div id="week-odd" class="week-content active"></div>
+    <div id="week-even" class="week-content"></div>
+</div>
+
+<div class="modal-overlay" id="modal">
+    <div class="modal-box">
+        <button class="close" id="modalClose">&times;</button>
+        <h3 id="modalTitle">Детали пары</h3>
+        <dl id="modalBody"></dl>
+    </div>
+</div>
+
+<script>
+    // ========== ДАННЫЕ ==========
+    const data = {
+        odd: {
+            days: {
+                'ПН': [
+                    { time: '1', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522' },
+                    { time: '2', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522' },
+                    { time: '3', subject: 'Анализ и подготовка данных', type: 'ЛР', teacher: 'Сизов П.В.', room: 'Г-407' },
+                    { time: '4', subject: 'Анализ и подготовка данных', type: 'ЛР', teacher: 'Сизов П.В.', room: 'Г-407' },
+                    { time: '5', subject: 'Физическая культура (основная группа)', type: 'П', teacher: 'Шаров М.А.', room: 'Большой спортзал' }
+                ],
+                'ВТ': [
+                    { time: '1', subject: 'Физическая культура (основная группа)', type: 'П', teacher: 'Шаров М.А.', room: 'Большой спортзал' },
+                    { time: '2', subject: 'Философия', type: 'Л', teacher: 'Сидоров Л.Г.', room: '3-213' },
+                    { time: '3', subject: 'Вычислительная математика', type: 'Л', teacher: 'Малышев Р.А.', room: 'Г-403' },
+                    { time: '4', subject: 'Исследование операций', type: 'Л', teacher: 'Михайлов Н.Л.', room: 'Г-523' },
+                    { time: '5', subject: 'Архитектура ИУС', type: 'Л', teacher: 'Павлов Р.В.', room: 'Г-403' },
+                    { time: '6', subject: 'Системы вторичного питания', type: 'Л', teacher: 'Павлов Р.В.', room: 'Г-435' }
+                ],
+                'СР': [
+                    { time: '1', subject: 'Исследование операций', type: 'Л', teacher: 'Михайлов Н.Л.', room: 'Г-523' },
+                    { time: '2', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522' },
+                    { time: '3', subject: 'Микропроцессорные системы', type: 'Л', teacher: 'Комаров В.М.', room: 'Г-403' },
+                    { time: '4', subject: 'Основы анализа данных', type: 'Л', teacher: 'Вязниковцев Д.А.', room: 'Г-519' },
+                    { time: '5', subject: 'Базы данных', type: 'Л', teacher: 'Сизов П.В.', room: 'Г-403' }
+                ],
+                'ЧТ': [
+                    { time: '8-17', subject: 'Производственная практика', type: 'П', teacher: '', room: '' }
+                ],
+                'ПТ': [
+                    { time: '8-17', subject: 'Производственная практика', type: 'П', teacher: '', room: '' }
+                ],
+                'СБ': [
+                    { time: '1', subject: 'Исследование операций', type: 'ЛР', teacher: 'Михайлов Н.Л.', room: 'Г-512' },
+                    { time: '2', subject: 'Исследование операций', type: 'ЛР', teacher: 'Михайлов Н.Л.', room: 'Г-512' },
+                    { time: '3', subject: 'Архитектура ИУС', type: 'ЛР', teacher: 'Павлов Р.В.', room: 'Г-421' },
+                    { time: '4', subject: 'Архитектура ИУС', type: 'ЛР', teacher: 'Павлов Р.В.', room: 'Г-421' },
+                    { time: '5', subject: 'Анализ и подготовка данных', type: 'Л', teacher: 'Сизов П.В.', room: 'Г-403' }
+                ]
+            }
+        },
+        even: {
+            days: {
+                'ПН': [
+                    { time: '1', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522' },
+                    { time: '2', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522' },
+                    { time: '3', subject: 'Микропроцессорные системы', type: 'П', teacher: 'Голубин С.А.', room: 'Г-407' },
+                    { time: '4', subject: 'Основы анализа данных', type: 'ЛР', teacher: 'Вязниковцев Д.А.', room: 'Г-515' },
+                    { time: '5', subject: 'Основы анализа данных', type: 'ЛР', teacher: 'Вязниковцев Д.А.', room: 'Г-515' },
+                    { time: '6', subject: 'Системы вторичного питания', type: 'Л', teacher: 'Павлов Р.В.', room: 'Г-435' }
+                ],
+                'ВТ': [
+                    { time: '1', subject: 'Физическая культура (основная группа)', type: 'П', teacher: 'Шаров М.А.', room: 'Большой спортзал' },
+                    { time: '2', subject: 'Философия', type: 'П', teacher: 'Сидоров Л.Г.', room: '3-213' },
+                    { time: '3', subject: 'Базы данных', type: 'ЛР', teacher: 'Сизов П.В.', room: 'Г-407' },
+                    { time: '4', subject: 'Базы данных', type: 'ЛР', teacher: 'Сизов П.В.', room: 'Г-407' },
+                    { time: '5', subject: 'Системы вторичного питания', type: 'ЛР', teacher: 'Павлов Р.В.', room: 'Г-512' },
+                    { time: '6', subject: 'Системы вторичного питания', type: 'ЛР', teacher: 'Павлов Р.В.', room: 'Г-512' }
+                ],
+                'СР': [
+                    { time: '1', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522' },
+                    { time: '2', subject: 'Микропроцессорные системы', type: 'Л', teacher: 'Комаров В.М.', room: 'Г-403' },
+                    { time: '3', subject: 'Вычислительная математика', type: 'ЛР', teacher: 'Малышев Р.А.', room: 'Г-407' },
+                    { time: '4', subject: 'Вычислительная математика', type: 'ЛР', teacher: 'Малышев Р.А.', room: 'Г-407' },
+                    { time: '5', subject: 'Основы анализа данных', type: 'Л', teacher: 'Вязниковцев Д.А.', room: 'Г-516' }
+                ],
+                'ЧТ': [
+                    { time: '8-17', subject: 'Производственная практика', type: 'П', teacher: '', room: '' }
+                ],
+                'ПТ': [
+                    { time: '8-17', subject: 'Производственная практика', type: 'П', teacher: '', room: '' }
+                ],
+                'СБ': [
+                    { time: '1', subject: 'Микропроцессорные системы', type: 'ЛР', teacher: 'Голубин С.А.', room: 'Г-407' },
+                    { time: '2', subject: 'Микропроцессорные системы', type: 'ЛР', teacher: 'Голубин С.А.', room: 'Г-407' },
+                    { time: '3', subject: 'Архитектура ИУС', type: 'Л', teacher: 'Павлов Р.В.', room: 'Г-403' },
+                    { time: '4', subject: 'Анализ и подготовка данных', type: 'Л', teacher: 'Сизов П.В.', room: 'Г-403' }
+                ]
+            }
+        }
+    };
+
+    const dayOrder = ['ПН','ВТ','СР','ЧТ','ПТ','СБ'];
+    const typeColors = { 'Л': '#22c55e', 'П': '#ef4444', 'ЛР': '#a855f7' };
+
+    function renderWeek(weekKey, filterType = 'all') {
+        const container = document.getElementById(`week-${weekKey}`);
+        const weekData = data[weekKey];
+        if (!weekData) { container.innerHTML = '<div class="bar">Нет данных</div>'; return; }
+
+        let html = '';
+        dayOrder.forEach(day => {
+            const pairs = weekData.days[day] || [];
+            const filtered = pairs.filter(p => filterType === 'all' || p.type === filterType);
+
+            html += `<div class="schedule-grid">`;
+            html += `<div class="day-label">${day}</div>`;
+            html += `<div class="day-cells">`;
+            if (filtered.length === 0) {
+                html += `<div class="empty-day">— нет занятий —</div>`;
+            } else {
+                filtered.forEach(p => {
+                    const color = typeColors[p.type] || '#888';
+                    const meta = (p.teacher || p.room) ? `${p.teacher} · ${p.room}` : '';
+                    const typeLabel = p.type;
+                    html += `<div class="pair" data-detail='${JSON.stringify(p)}'>
+                                <span class="time">${p.time}</span>
+                                <span class="subject">
+                                    <span class="type-badge" style="background:${color};color:#fff;">${typeLabel}</span>
+                                    ${p.subject}
+                                </span>
+                                ${meta ? `<span class="meta">${meta}</span>` : ''}
+                             </div>`;
+                });
+            }
+            html += `</div></div>`;
+        });
+
+        container.innerHTML = html;
+    }
+
+    let currentFilter = 'all';
+    let currentWeek = 'odd';
+
+    function refresh() {
+        renderWeek('odd', currentFilter);
+        renderWeek('even', currentFilter);
+        document.querySelectorAll('.week-content').forEach(el => el.classList.remove('active'));
+        document.getElementById(`week-${currentWeek}`).classList.add('active');
+    }
+
+    document.querySelectorAll('.week-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.week-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            currentWeek = this.dataset.week;
+            refresh();
+        });
+    });
+
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            currentFilter = this.dataset.filter;
+            refresh();
+        });
+    });
+
+    document.addEventListener('click', function(e) {
+        const pairEl = e.target.closest('.pair');
+        if (pairEl && pairEl.dataset.detail) {
+            try {
+                const p = JSON.parse(pairEl.dataset.detail);
+                const modal = document.getElementById('modal');
+                document.getElementById('modalTitle').textContent = p.subject;
+                const body = document.getElementById('modalBody');
+                body.innerHTML = `
+                    <dt>Время</dt><dd>${p.time} пара</dd>
+                    <dt>Тип</dt><dd>${p.type}</dd>
+                    <dt>Преподаватель</dt><dd>${p.teacher || '—'}</dd>
+                    <dt>Аудитория</dt><dd>${p.room || '—'}</dd>
+                    <dt>Неделя</dt><dd>${currentWeek === 'odd' ? 'Нечётная' : 'Чётная'}</dd>
+                `;
+                modal.classList.add('open');
+            } catch(e) {}
+        }
+    });
+
+    document.getElementById('modalClose').addEventListener('click', function() {
+        document.getElementById('modal').classList.remove('open');
+    });
+    document.getElementById('modal').addEventListener('click', function(e) {
+        if (e.target === this) this.classList.remove('open');
+    });
+
+    document.getElementById('exportCsv').addEventListener('click', function() {
+        let csv = 'Неделя,День,Время,Предмет,Тип,Преподаватель,Аудитория\n';
+        ['odd','even'].forEach(w => {
+            const weekLabel = w === 'odd' ? 'Нечётная' : 'Чётная';
+            const days = data[w].days;
+            dayOrder.forEach(d => {
+                (days[d] || []).forEach(p => {
+                    csv += `${weekLabel},${d},${p.time},${p.subject},${p.type},${p.teacher || ''},${p.room || ''}\n`;
+                });
+            });
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'raspisanie_IVBk-24.csv';
+        link.click();
+    });
+
+    refresh();
+
+    // ===== РЕГИСТРАЦИЯ SERVICE WORKER =====
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js')
+                .then(function(reg) {
+                    console.log('Service Worker зарегистрирован', reg);
+                })
+                .catch(function(err) {
+                    console.log('Ошибка регистрации Service Worker', err);
+                });
+        });
+    }
+</script>
+</body>
+</html>
