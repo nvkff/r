@@ -7,7 +7,7 @@
     <link rel="manifest" href="/manifest.json" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
@@ -20,6 +20,7 @@
             --muted: #848d9a;
             --dim: #4d5562;
             --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.15);
             --green: #22c55e;
             --red: #ef4444;
             --purple: #a855f7;
@@ -66,9 +67,64 @@
             padding: 4px 14px;
         }
 
-        .week-tabs { display: flex; gap: 4px; padding: 6px 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
-        .week-tab { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; padding: 4px 12px; border: 1px solid var(--border); cursor: pointer; color: var(--muted); background: transparent; }
+        .week-tabs {
+            display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 20px;
+            background: var(--surface); border-bottom: 1px solid var(--border);
+            align-items: center;
+        }
+        .week-tab {
+            font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+            padding: 4px 12px; border: 1px solid var(--border); cursor: pointer;
+            color: var(--muted); background: transparent;
+        }
         .week-tab.active { border-color: var(--accent); color: #fff; background: var(--surface-hover); }
+
+        .current-week-btn {
+            font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+            padding: 4px 12px; border: 1px solid var(--accent); color: #fff;
+            background: var(--accent-glow); cursor: pointer; display: flex; align-items: center; gap: 6px;
+        }
+        .current-week-btn::before { content: '●'; color: var(--green); font-size: 9px; }
+
+        .calendar-toggle-btn {
+            font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+            padding: 4px 12px; border: 1px solid var(--border); color: var(--muted);
+            background: transparent; cursor: pointer; margin-left: auto;
+        }
+        .calendar-toggle-btn.active { border-color: var(--accent); color: #fff; background: var(--surface-hover); }
+
+        /* Календарный блок */
+        .calendar-panel {
+            display: none; background: #0c0e12; border-bottom: 1px solid var(--border);
+            padding: 16px 20px;
+        }
+        .calendar-panel.open { display: block; }
+        .calendar-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px; font-family: var(--font-mono);
+        }
+        .calendar-title { font-size: 12px; font-weight: 600; text-transform: uppercase; color: #fff; }
+        .calendar-nav-btn {
+            background: transparent; border: 1px solid var(--border); color: var(--text);
+            padding: 3px 8px; font-family: var(--font-mono); font-size: 11px; cursor: pointer;
+        }
+        .calendar-grid {
+            display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+            font-family: var(--font-mono); font-size: 11px; text-align: center;
+        }
+        .cal-head { color: var(--dim); padding: 4px 0; font-size: 9px; text-transform: uppercase; }
+        .cal-day {
+            padding: 8px 4px; border: 1px solid var(--border); background: var(--surface);
+            cursor: pointer; position: relative; transition: border-color 0.1s, background 0.1s;
+        }
+        .cal-day:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+        .cal-day.empty { border-color: transparent; background: transparent; cursor: default; }
+        .cal-day.today { border-color: var(--accent); background: var(--accent-glow); font-weight: 700; color: #fff; }
+        .cal-day.selected { border-color: #fff; background: var(--surface-hover); color: #fff; }
+        .cal-day .cal-week-tag {
+            display: block; font-size: 8px; color: var(--dim); margin-top: 2px;
+        }
+
         .week-content { display: none; }
         .week-content.active { display: block; }
 
@@ -83,14 +139,14 @@
         }
         .schedule-grid .day-cells { padding: 4px 10px; }
         .pair {
-            padding: 2px 0; border-bottom: 1px solid var(--border);
+            padding: 4px 0; border-bottom: 1px solid var(--border);
             cursor: pointer; transition: background 0.1s;
         }
         .pair:hover { background: var(--surface-hover); }
         .pair:last-child { border-bottom: none; }
         .pair .time { font-family: var(--font-mono); font-size: 10px; color: var(--dim); display: inline-block; width: 36px; }
         .pair .subject { color: #fff; }
-        .pair .meta { font-size: 10px; color: var(--muted); }
+        .pair .meta { font-size: 10px; color: var(--muted); margin-left: 6px; }
 
         .type-badge {
             display: inline-block;
@@ -102,33 +158,44 @@
             margin-right: 6px;
         }
 
-        .empty-day { color: var(--dim); font-style: italic; padding: 4px 0; }
+        .empty-day { color: var(--dim); font-style: italic; padding: 6px 0; }
 
         .modal-overlay {
             display: none; position: fixed; inset: 0;
-            background: rgba(0,0,0,0.7); z-index: 1000;
+            background: rgba(0,0,0,0.75); z-index: 1000;
             align-items: center; justify-content: center;
         }
         .modal-overlay.open { display: flex; }
         .modal-box {
             background: var(--surface); border: 1px solid var(--border-strong);
-            max-width: 500px; width: 90%; padding: 24px;
+            max-width: 520px; width: 92%; max-height: 85vh; overflow-y: auto; padding: 20px;
             position: relative;
         }
         .modal-box .close {
-            position: absolute; top: 8px; right: 12px;
+            position: absolute; top: 10px; right: 14px;
             background: none; border: none; color: var(--muted);
-            font-size: 18px; cursor: pointer;
+            font-size: 20px; cursor: pointer;
         }
-        .modal-box h3 { margin-bottom: 8px; color: #fff; }
-        .modal-box dl { display: grid; grid-template-columns: 80px 1fr; gap: 4px 12px; font-size: 13px; }
+        .modal-box h3 { margin-bottom: 12px; color: #fff; font-size: 15px; }
+        .modal-box dl { display: grid; grid-template-columns: 90px 1fr; gap: 6px 12px; font-size: 13px; }
         .modal-box dt { color: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+
+        .day-modal-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+        .day-modal-item {
+            padding: 8px 10px; background: var(--bg); border: 1px solid var(--border);
+            font-size: 12px;
+        }
+        .day-modal-item .pair-hdr {
+            display: flex; justify-content: space-between; font-family: var(--font-mono);
+            font-size: 10px; color: var(--muted); margin-bottom: 4px;
+        }
 
         @media (max-width: 720px) {
             .schedule-grid { grid-template-columns: 1fr; }
             .schedule-grid .day-label { border-right: none; }
             .controls { flex-direction: column; align-items: stretch; }
             .controls .export-btn { margin-left: 0; }
+            .calendar-toggle-btn { margin-left: 0; width: 100%; text-align: center; }
         }
     </style>
 </head>
@@ -155,104 +222,139 @@
     </div>
 
     <div class="week-tabs">
+        <button class="current-week-btn" id="btnCurrentWeek">Текущая: ...</button>
         <button class="week-tab active" data-week="odd">Нечётная</button>
         <button class="week-tab" data-week="even">Чётная</button>
+        <button class="calendar-toggle-btn" id="btnToggleCalendar">📅 Календарь</button>
+    </div>
+
+    <!-- Интерактивный терминальный календарь -->
+    <div class="calendar-panel" id="calendarPanel">
+        <div class="calendar-header">
+            <button class="calendar-nav-btn" id="calPrev">&larr;</button>
+            <div class="calendar-title" id="calMonthTitle">Ноябрь 2026</div>
+            <button class="calendar-nav-btn" id="calNext">&rarr;</button>
+        </div>
+        <div class="calendar-grid" id="calGrid"></div>
     </div>
 
     <div id="week-odd" class="week-content active"></div>
     <div id="week-even" class="week-content"></div>
 </div>
 
+<!-- Модальное окно деталей пары / расписания на день -->
 <div class="modal-overlay" id="modal">
     <div class="modal-box">
         <button class="close" id="modalClose">&times;</button>
         <h3 id="modalTitle">Детали пары</h3>
-        <dl id="modalBody"></dl>
+        <div id="modalBody"></div>
     </div>
 </div>
 
 <script>
-    // ========== ДАННЫЕ ==========
+    // Начало семестра (понедельник 1-й нечётной недели)
+    const SEMESTER_START_MONDAY = new Date(2026, 7, 31); // 31 августа 2026
+
+    function getAcademicWeekInfo(targetDate = new Date()) {
+        const d = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+        const diffDays = Math.floor((d - SEMESTER_START_MONDAY) / (1000 * 60 * 60 * 24));
+        const weekNum = Math.floor(diffDays / 7) + 1;
+        const isOdd = (weekNum % 2 !== 0);
+        return {
+            weekNum: weekNum,
+            isOdd: isOdd,
+            weekKey: isOdd ? 'odd' : 'even',
+            inSemester: (weekNum >= 1 && weekNum <= 17)
+        };
+    }
+
+    // ========== ПОЛНАЯ БАЗА ДАННЫХ РАСПИСАНИЯ ==========
     const data = {
         odd: {
             days: {
                 'ПН': [
-                    { time: '1', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522' },
-                    { time: '2', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522' },
-                    { time: '3', subject: 'Анализ и подготовка данных', type: 'ЛР', teacher: 'Сизов П.В.', room: 'Г-407' },
-                    { time: '4', subject: 'Анализ и подготовка данных', type: 'ЛР', teacher: 'Сизов П.В.', room: 'Г-407' },
-                    { time: '5', subject: 'Физическая культура (основная группа)', type: 'П', teacher: 'Шаров М.А.', room: 'Большой спортзал' },
-                    { time: '6', subject: 'Системы вторичного питания', type: 'Л', teacher: 'Павлов Р.В.', room: 'Г-435' }
+                    { time: '1', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522', weeks: [1,17] },
+                    { time: '2', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522', weeks: [1,17] },
+                    { time: '3', subject: 'Анализ и подготовка данных', type: 'ЛР', teacher: 'Сизов П.В.', room: 'Г-407', weeks: [3,17] },
+                    { time: '4', subject: 'Анализ и подготовка данных', type: 'ЛР', teacher: 'Сизов П.В.', room: 'Г-407', weeks: [3,17] },
+                    { time: '5', subject: 'Физическая культура (основная группа)', type: 'П', teacher: 'Шаров М.А.', room: 'Большой спортзал', weeks: [1,17] },
+                    { time: '6', subject: 'Системы вторичного питания', type: 'Л', teacher: 'Павлов Р.В.', room: 'Г-435', weeks: [2,17] }
                 ],
                 'ВТ': [
-                    { time: '1', subject: 'Физическая культура (основная группа)', type: 'П', teacher: 'Шаров М.А.', room: 'Большой спортзал' },
-                    { time: '2', subject: 'Философия', type: 'Л', teacher: 'Сидоров Л.Г.', room: '3-213' },
-                    { time: '3', subject: 'Вычислительная математика', type: 'Л', teacher: 'Малышев Р.А.', room: 'Г-403' },
-                    { time: '4', subject: 'Исследование операций', type: 'Л', teacher: 'Михайлов Н.Л.', room: 'Г-523' },
-                    { time: '5', subject: 'Архитектура ИУС', type: 'Л', teacher: 'Павлов Р.В.', room: 'Г-403' },
-                    { time: '6', subject: 'Системы вторичного питания', type: 'Л', teacher: 'Павлов Р.В.', room: 'Г-435' }
+                    { time: '1', subject: 'Физическая культура (основная группа)', type: 'П', teacher: 'Шаров М.А.', room: 'Большой спортзал', weeks: [1,17] },
+                    { time: '2', subject: 'Философия', type: 'Л', teacher: 'Сидоров Л.Г.', room: '3-213', weeks: [3,17] },
+                    { time: '3', subject: 'Вычислительная математика', type: 'Л', teacher: 'Малышев Р.А.', room: 'Г-403', weeks: [3,17] },
+                    { time: '4', subject: 'Исследование операций', type: 'Л', teacher: 'Михайлов Н.Л.', room: 'Г-523', weeks: [1,17] },
+                    { time: '5', subject: 'Архитектура ИУС', type: 'Л', teacher: 'Павлов Р.В.', room: 'Г-403', weeks: [2,17] },
+                    { time: '6', subject: 'Системы вторичного питания', type: 'Л', teacher: 'Павлов Р.В.', room: 'Г-435', weeks: [2,17] }
                 ],
                 'СР': [
-                    { time: '1', subject: 'Исследование операций', type: 'Л', teacher: 'Михайлов Н.Л.', room: 'Г-523' },
-                    { time: '2', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522' },
-                    { time: '3', subject: 'Микропроцессорные системы', type: 'Л', teacher: 'Комаров В.М.', room: 'Г-403' },
-                    { time: '4', subject: 'Основы анализа данных', type: 'Л', teacher: 'Вязниковцев Д.А.', room: 'Г-519' },
-                    { time: '5', subject: 'Базы данных', type: 'Л', teacher: 'Сизов П.В.', room: 'Г-403' }
+                    { time: '1', subject: 'Исследование операций', type: 'Л', teacher: 'Михайлов Н.Л.', room: 'Г-523', weeks: [1,17] },
+                    { time: '2', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522', weeks: [1,17] },
+                    { time: '3', subject: 'Микропроцессорные системы', type: 'Л', teacher: 'Комаров В.М.', room: 'Г-403', validWeeks: [1,2,3,4,5,6,7,8,9,11,12,13,14,15,16,17] },
+                    { time: '4', subject: 'Основы анализа данных', type: 'Л', teacher: 'Вязниковцев Д.А.', room: 'Г-519', validWeeks: [1,2,3,4,5,6,7,8,9,11,12,13,14,15,16,17] },
+                    { time: '5', subject: 'Базы данных', type: 'Л', teacher: 'Сизов П.В.', room: 'Г-403', weeks: [1,16] }
                 ],
                 'ЧТ': [
-                    { time: '1–5', subject: 'Распределенная практика', type: 'П', teacher: 'Предприятие', room: 'Завод' }
+                    { time: '1–5', subject: 'Распределенная практика', type: 'П', teacher: 'Предприятие', room: 'Завод', weeks: [1,17] }
                 ],
                 'ПТ': [
-                    { time: '1–5', subject: 'Распределенная практика', type: 'П', teacher: 'Предприятие', room: 'Завод' }
+                    { time: '1–5', subject: 'Распределенная практика', type: 'П', teacher: 'Предприятие', room: 'Завод', weeks: [1,17] }
                 ],
                 'СБ': [
-                    { time: '1', subject: 'Исследование операций', type: 'ЛР', teacher: 'Михайлов Н.Л.', room: 'Г-512' },
-                    { time: '2', subject: 'Исследование операций', type: 'ЛР', teacher: 'Михайлов Н.Л.', room: 'Г-512' },
-                    { time: '3', subject: 'Архитектура ИУС', type: 'ЛР', teacher: 'Павлов Р.В.', room: 'Г-421' },
-                    { time: '4', subject: 'Архитектура ИУС', type: 'ЛР', teacher: 'Павлов Р.В.', room: 'Г-421' },
-                    { time: '5', subject: 'Анализ и подготовка данных', type: 'Л', teacher: 'Сизов П.В.', room: 'Г-403' }
+                    { time: '1', subject: 'Исследование операций', type: 'ЛР', teacher: 'Михайлов Н.Л.', room: 'Г-512', weeks: [1,16] },
+                    { time: '2', subject: 'Исследование операций', type: 'ЛР', teacher: 'Михайлов Н.Л.', room: 'Г-512', weeks: [1,16] },
+                    { time: '3', subject: 'Архитектура ИУС', type: 'ЛР', teacher: 'Павлов Р.В.', room: 'Г-421', weeks: [1,16] },
+                    { time: '4', subject: 'Архитектура ИУС', type: 'ЛР', teacher: 'Павлов Р.В.', room: 'Г-421', weeks: [1,16] },
+                    { time: '5', subject: 'Анализ и подготовка данных', type: 'Л', teacher: 'Сизов П.В.', room: 'Г-403', weeks: [1,16] }
                 ]
             }
         },
         even: {
             days: {
                 'ПН': [
-                    { time: '1', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522' },
-                    { time: '2', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522' },
-                    { time: '3', subject: 'Микропроцессорные системы', type: 'П', teacher: 'Голубин С.А.', room: 'Г-407' },
-                    { time: '4', subject: 'Основы анализа данных', type: 'ЛР', teacher: 'Вязниковцев Д.А.', room: 'Г-515' },
-                    { time: '5', subject: 'Основы анализа данных', type: 'ЛР', teacher: 'Вязниковцев Д.А.', room: 'Г-515' }
+                    { time: '1', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522', weeks: [1,17] },
+                    { time: '2', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522', weeks: [1,17] },
+                    { time: '3', subject: 'Микропроцессорные системы', type: 'П', teacher: 'Голубин С.А.', room: 'Г-407', weeks: [1,16] },
+                    { time: '4', subject: 'Основы анализа данных', type: 'ЛР', teacher: 'Вязниковцев Д.А.', room: 'Г-515', weeks: [1,16] },
+                    { time: '5', subject: 'Основы анализа данных', type: 'ЛР', teacher: 'Вязниковцев Д.А.', room: 'Г-515', weeks: [1,16] }
                 ],
                 'ВТ': [
-                    { time: '1', subject: 'Физическая культура (основная группа)', type: 'П', teacher: 'Шаров М.А.', room: 'Большой спортзал' },
-                    { time: '2', subject: 'Философия', type: 'П', teacher: 'Сидоров Л.Г.', room: '3-213' },
-                    { time: '3', subject: 'Базы данных', type: 'ЛР', teacher: 'Сизов П.В.', room: 'Г-407' },
-                    { time: '4', subject: 'Базы данных', type: 'ЛР', teacher: 'Сизов П.В.', room: 'Г-407' }
+                    { time: '1', subject: 'Физическая культура (основная группа)', type: 'П', teacher: 'Шаров М.А.', room: 'Большой спортзал', weeks: [1,17] },
+                    { time: '2', subject: 'Философия', type: 'П', teacher: 'Сидоров Л.Г.', room: '3-213', weeks: [2,16] },
+                    { time: '3', subject: 'Базы данных', type: 'ЛР', teacher: 'Сизов П.В.', room: 'Г-407', weeks: [1,16] },
+                    { time: '4', subject: 'Базы данных', type: 'ЛР', teacher: 'Сизов П.В.', room: 'Г-407', weeks: [1,16] }
                 ],
                 'СР': [
-                    { time: '1', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522' },
-                    { time: '2', subject: 'Микропроцессорные системы', type: 'Л', teacher: 'Комаров В.М.', room: 'Г-403' },
-                    { time: '3', subject: 'Вычислительная математика', type: 'ЛР', teacher: 'Малышев Р.А.', room: 'Г-407' },
-                    { time: '4', subject: 'Вычислительная математика', type: 'ЛР', teacher: 'Малышев Р.А.', room: 'Г-407' },
-                    { time: '5', subject: 'Основы анализа данных', type: 'Л', teacher: 'Вязниковцев Д.А.', room: 'Г-516' },
-                    { time: '6', subject: 'Системы вторичного питания', type: 'ЛР', teacher: 'Павлов Р.В.', room: 'Г-403' },
-                    { time: '7', subject: 'Системы вторичного питания', type: 'ЛР', teacher: 'Павлов Р.В.', room: 'Г-403' }
+                    { time: '1', subject: 'Английский язык. Траектория B1-B2', type: 'П', teacher: 'Тихомирова С.В.', room: 'Г-522', weeks: [1,17] },
+                    { time: '2', subject: 'Микропроцессорные системы', type: 'Л', teacher: 'Комаров В.М.', room: 'Г-403', validWeeks: [1,2,3,4,5,6,7,8,9,11,12,13,14,15,16,17] },
+                    { time: '3', subject: 'Вычислительная математика', type: 'ЛР', teacher: 'Малышев Р.А.', room: 'Г-407', validWeeks: [2,3,4,5,6,7,8,12,13,14,15,16,17] },
+                    { time: '4', subject: 'Вычислительная математика', type: 'ЛР', teacher: 'Малышев Р.А.', room: 'Г-407', validWeeks: [2,3,4,5,6,7,8,12,13,14,15,16,17] },
+                    { time: '5', subject: 'Основы анализа данных', type: 'Л', teacher: 'Вязниковцев Д.А.', room: 'Г-516', validWeeks: [1,2,3,4,5,6,7,8,9,11,12,13,14,15,16,17] },
+                    { time: '6', subject: 'Системы вторичного питания', type: 'ЛР', teacher: 'Павлов Р.В.', room: 'Г-403', weeks: [1,16] },
+                    { time: '7', subject: 'Системы вторичного питания', type: 'ЛР', teacher: 'Павлов Р.В.', room: 'Г-403', weeks: [1,16] }
                 ],
                 'ЧТ': [
-                    { time: '1–5', subject: 'Распределенная практика', type: 'П', teacher: 'Предприятие', room: 'Завод' }
+                    { time: '1–5', subject: 'Распределенная практика', type: 'П', teacher: 'Предприятие', room: 'Завод', weeks: [1,17] }
                 ],
                 'ПТ': [
-                    { time: '1–5', subject: 'Распределенная практика', type: 'П', teacher: 'Предприятие', room: 'Завод' }
+                    { time: '1–5', subject: 'Распределенная практика', type: 'П', teacher: 'Предприятие', room: 'Завод', weeks: [1,17] }
                 ],
                 'СБ': [
-                    { time: '1', subject: 'Микропроцессорные системы', type: 'ЛР', teacher: 'Голубин С.А.', room: 'Г-407' },
-                    { time: '2', subject: 'Микропроцессорные системы', type: 'ЛР', teacher: 'Голубин С.А.', room: 'Г-407' },
-                    { time: '3', subject: 'Архитектура ИУС', type: 'Л', teacher: 'Павлов Р.В.', room: 'Г-403' },
-                    { time: '4', subject: 'Анализ и подготовка данных', type: 'Л', teacher: 'Сизов П.В.', room: 'Г-402' }
+                    { time: '1', subject: 'Микропроцессорные системы', type: 'ЛР', teacher: 'Голубин С.А.', room: 'Г-407', weeks: [1,16] },
+                    { time: '2', subject: 'Микропроцессорные системы', type: 'ЛР', teacher: 'Голубин С.А.', room: 'Г-407', weeks: [1,16] },
+                    { time: '3', subject: 'Архитектура ИУС', type: 'Л', teacher: 'Павлов Р.В.', room: 'Г-403', weeks: [2,17] },
+                    { time: '4', subject: 'Анализ и подготовка данных', type: 'Л', teacher: 'Сизов П.В.', room: 'Г-402', weeks: [1,16] }
                 ]
             }
         }
     };
+
+    function isPairActiveOnWeek(pair, weekNum) {
+        if (pair.validWeeks) return pair.validWeeks.includes(weekNum);
+        if (pair.weeks) return (weekNum >= pair.weeks[0] && weekNum <= pair.weeks[1]);
+        return true;
+    }
 
     const dayOrder = ['ПН','ВТ','СР','ЧТ','ПТ','СБ'];
     const typeColors = { 'Л': '#22c55e', 'П': '#ef4444', 'ЛР': '#a855f7' };
@@ -260,7 +362,7 @@
     function renderWeek(weekKey, filterType = 'all') {
         const container = document.getElementById(`week-${weekKey}`);
         const weekData = data[weekKey];
-        if (!weekData) { container.innerHTML = '<div class="bar">Нет данных</div>'; return; }
+        if (!weekData) { container.innerHTML = '<div class="empty-day">Нет данных</div>'; return; }
 
         let html = '';
         dayOrder.forEach(day => {
@@ -303,6 +405,26 @@
         document.getElementById(`week-${currentWeek}`).classList.add('active');
     }
 
+    // Инициализация кнопки текущей недели
+    const curInfo = getAcademicWeekInfo();
+    const btnCur = document.getElementById('btnCurrentWeek');
+    if (curInfo.inSemester) {
+        btnCur.textContent = `ТЕКУЩАЯ: ${curInfo.weekNum} НЕД. (${curInfo.isOdd ? 'НЕЧЁТ' : 'ЧЁТ'})`;
+        currentWeek = curInfo.weekKey;
+    } else {
+        btnCur.textContent = `КАНИКУЛЫ / ВНЕ СЕМЕСТРА`;
+    }
+
+    btnCur.addEventListener('click', function() {
+        if (curInfo.inSemester) {
+            currentWeek = curInfo.weekKey;
+            document.querySelectorAll('.week-tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.week === currentWeek);
+            });
+            refresh();
+        }
+    });
+
     document.querySelectorAll('.week-tab').forEach(tab => {
         tab.addEventListener('click', function() {
             document.querySelectorAll('.week-tab').forEach(t => t.classList.remove('active'));
@@ -321,22 +443,24 @@
         });
     });
 
+    // ========== МОДАЛКА ПАРЫ ==========
     document.addEventListener('click', function(e) {
         const pairEl = e.target.closest('.pair');
         if (pairEl && pairEl.dataset.detail) {
             try {
                 const p = JSON.parse(pairEl.dataset.detail);
-                const modal = document.getElementById('modal');
                 document.getElementById('modalTitle').textContent = p.subject;
                 const body = document.getElementById('modalBody');
                 body.innerHTML = `
-                    <dt>Время</dt><dd>${p.time} пара</dd>
-                    <dt>Тип</dt><dd>${p.type}</dd>
-                    <dt>Преподаватель</dt><dd>${p.teacher || '—'}</dd>
-                    <dt>Аудитория</dt><dd>${p.room || '—'}</dd>
-                    <dt>Неделя</dt><dd>${currentWeek === 'odd' ? 'Нечётная' : 'Чётная'}</dd>
+                    <dl>
+                        <dt>Время</dt><dd>${p.time} пара</dd>
+                        <dt>Тип</dt><dd>${p.type}</dd>
+                        <dt>Преподаватель</dt><dd>${p.teacher || '—'}</dd>
+                        <dt>Аудитория</dt><dd>${p.room || '—'}</dd>
+                        <dt>Неделя</dt><dd>${currentWeek === 'odd' ? 'Нечётная' : 'Чётная'}</dd>
+                    </dl>
                 `;
-                modal.classList.add('open');
+                document.getElementById('modal').classList.add('open');
             } catch(e) {}
         }
     });
@@ -348,6 +472,135 @@
         if (e.target === this) this.classList.remove('open');
     });
 
+    // ========== ИНТЕРАКТИВНЫЙ КАЛЕНДАРЬ ==========
+    let calDate = new Date(2026, 10, 1); // Ноябрь 2026 по умолчанию
+    const monthsRu = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+    const calDayNames = ['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'];
+
+    const btnToggleCal = document.getElementById('btnToggleCalendar');
+    const calPanel = document.getElementById('calendarPanel');
+
+    btnToggleCal.addEventListener('click', function() {
+        calPanel.classList.toggle('open');
+        this.classList.toggle('active');
+        renderCalendar();
+    });
+
+    document.getElementById('calPrev').addEventListener('click', function() {
+        calDate.setMonth(calDate.getMonth() - 1);
+        renderCalendar();
+    });
+    document.getElementById('calNext').addEventListener('click', function() {
+        calDate.setMonth(calDate.getMonth() + 1);
+        renderCalendar();
+    });
+
+    function renderCalendar() {
+        const year = calDate.getFullYear();
+        const month = calDate.getMonth();
+        document.getElementById('calMonthTitle').textContent = `${monthsRu[month]} ${year}`;
+
+        const grid = document.getElementById('calGrid');
+        grid.innerHTML = '';
+
+        // Шапка дней недели
+        calDayNames.forEach(name => {
+            const el = document.createElement('div');
+            el.className = 'cal-head';
+            el.textContent = name;
+            grid.appendChild(el);
+        });
+
+        const firstDayIndex = (new Date(year, month, 1).getDay() + 6) % 7; // Понедельник = 0
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const today = new Date();
+
+        // Пустые ячейки до 1 числа
+        for (let i = 0; i < firstDayIndex; i++) {
+            const empty = document.createElement('div');
+            empty.className = 'cal-day empty';
+            grid.appendChild(empty);
+        }
+
+        // Дни месяца
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dayEl = document.createElement('div');
+            dayEl.className = 'cal-day';
+            const thisDate = new Date(year, month, d);
+            const wInfo = getAcademicWeekInfo(thisDate);
+
+            const isToday = (today.getFullYear() === year && today.getMonth() === month && today.getDate() === d);
+            if (isToday) dayEl.classList.add('today');
+
+            let weekLabel = wInfo.inSemester ? `${wInfo.weekNum}н` : '';
+            dayEl.innerHTML = `<strong>${d}</strong><span class="cal-week-tag">${weekLabel}</span>`;
+
+            dayEl.addEventListener('click', function() {
+                openDayScheduleModal(thisDate, wInfo);
+            });
+
+            grid.appendChild(dayEl);
+        }
+    }
+
+    function openDayScheduleModal(dateObj, wInfo) {
+        const dayIdx = (dateObj.getDay() + 6) % 7; // 0=ПН, 5=СБ, 6=ВС
+        const dayKey = dayOrder[dayIdx];
+        const dayFullNames = ['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
+        const dateFormatted = `${dateObj.getDate()} ${monthsRu[dateObj.getMonth()].toLowerCase()} ${dateObj.getFullYear()}`;
+
+        document.getElementById('modalTitle').textContent = `${dayFullNames[dayIdx]}, ${dateFormatted}`;
+
+        const body = document.getElementById('modalBody');
+        let html = '';
+
+        if (!wInfo.inSemester) {
+            html = `<div class="empty-day">Дата находится вне рамок осеннего семестра (каникулы/сессия).</div>`;
+        } else if (dayIdx === 6) {
+            html = `
+                <dl style="margin-bottom:12px;">
+                    <dt>Неделя</dt><dd>${wInfo.weekNum} (${wInfo.isOdd ? 'нечётная' : 'чётная'})</dd>
+                </dl>
+                <div class="empty-day">Воскресенье — выходной день</div>
+            `;
+        } else {
+            const weekKey = wInfo.weekKey;
+            const pairs = (data[weekKey].days[dayKey] || []);
+            const activePairs = pairs.filter(p => isPairActiveOnWeek(p, wInfo.weekNum));
+
+            html += `
+                <dl style="margin-bottom:12px;">
+                    <dt>Семестр</dt><dd>${wInfo.weekNum}-я неделя (${wInfo.isOdd ? 'нечётная' : 'чётная'})</dd>
+                    <dt>Всего пар</dt><dd>${activePairs.length}</dd>
+                </dl>
+            `;
+
+            if (activePairs.length === 0) {
+                html += `<div class="empty-day">— занятий нет —</div>`;
+            } else {
+                html += `<div class="day-modal-list">`;
+                activePairs.forEach(p => {
+                    const color = typeColors[p.type] || '#888';
+                    html += `
+                        <div class="day-modal-item">
+                            <div class="pair-hdr">
+                                <span>${p.time} ПАРА</span>
+                                <span style="color:${color}; font-weight:600;">[${p.type}]</span>
+                            </div>
+                            <div style="font-weight:600; color:#fff; margin-bottom:2px;">${p.subject}</div>
+                            <div style="color:var(--muted); font-size:11px;">${p.teacher ? p.teacher + ' · ' : ''}${p.room || ''}</div>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+        }
+
+        body.innerHTML = html;
+        document.getElementById('modal').classList.add('open');
+    }
+
+    // ========== ЭКСПОРТ CSV ==========
     document.getElementById('exportCsv').addEventListener('click', function() {
         let csv = 'Неделя,День,Время,Предмет,Тип,Преподаватель,Аудитория\n';
         ['odd','even'].forEach(w => {
